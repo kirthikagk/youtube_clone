@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ video.title }} - YouTube Clone{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Video Player -->
+            <div class="video-player mb-3">
+                <video controls class="w-100" style="max-height: 500px;">
+                    <source src="{{ video.video_file.url }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            
+            <!-- Video Info -->
+            <div class="video-info mb-3">
+                <h3>{{ video.title }}</h3>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="text-muted">{{ video.views }} views • {{ video.upload_date|date:"M d, Y" }}</span>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-outline-secondary like-btn" data-video-id="{{ video.video_id }}" data-is-like="true">
+                            <i class="bi bi-hand-thumbs-up{% if user_like and user_like.is_like %}-fill{% endif %}"></i>
+                            <span class="likes-count">{{ likes_count }}</span>
+                        </button>
+                        <button class="btn btn-outline-secondary dislike-btn" data-video-id="{{ video.video_id }}" data-is-like="false">
+                            <i class="bi bi-hand-thumbs-down{% if user_like and not user_like.is_like %}-fill{% endif %}"></i>
+                            <span class="dislikes-count">{{ dislikes_count }}</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="channel-info mb-3">
+                    <div class="d-flex align-items-center">
+                        <div class="channel-avatar me-3">
+                            <i class="bi bi-person-circle fs-2"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">{{ video.user.username }}</h5>
+                            <small class="text-muted">{{ video.user.profile.get_subscriber_count|default:0 }} subscribers</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="video-description mb-4">
+                    <p>{{ video.description|linebreaks }}</p>
+                    {% if video.tags %}
+                    <div class="video-tags">
+                        {% for tag in video.tags %}
+                        <span class="badge bg-secondary me-1">#{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <hr>
+                
+                <!-- Comments Section -->
+                <div class="comments-section">
+                    <h5 class="mb-3">{{ comments.count }} Comments</h5>
+                    
+                    {% if user.is_authenticated %}
+                    <form method="POST" class="mb-4">
+                        {% csrf_token %}
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-person-circle fs-2 me-3"></i>
+                            <div class="flex-grow-1">
+                                {{ comment_form.content }}
+                                <div class="mt-2">
+                                    <button type="submit" class="btn btn-primary btn-sm">Comment</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="this.form.reset()">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    {% else %}
+                    <p class="text-muted">Please <a href="{% url 'login' %}">login</a> to comment.</p>
+                    {% endif %}
+                    
+                    <!-- Comments List -->
+                    <div class="comments-list">
+                        {% for comment in comments %}
+                        <div class="comment mb-3">
+                            <div class="d-flex">
+                                <i class="bi bi-person-circle fs-3 me-3"></i>
+                                <div class="flex-grow-1">
+                                    <div class="comment-header">
+                                        <strong>{{ comment.user.username }}</strong>
+                                        <small class="text-muted ms-2">{{ comment.created_at|timesince }} ago</small>
+                                        {% if comment.user == request.user %}
+                                        <form method="POST" action="{% url 'delete_comment' comment.id %}" class="d-inline ms-2">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-link text-danger p-0">Delete</button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                    <p class="comment-content mb-0">{{ comment.content }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">No comments yet. Be the first to comment!</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Related Videos Sidebar -->
+        <div class="col-lg-4">
+            <h5 class="mb-3">Related Videos</h5>
+            {% for related_video in related_videos %}
+            <div class="related-video mb-3">
+                <a href="{% url 'video_detail' related_video.video_id %}" class="text-decoration-none">
+                    <div class="d-flex">
+                        <div class="related-thumbnail me-2" style="width: 168px; height: 94px;">
+                            {% if related_video.thumbnail %}
+                                <img src="{{ related_video.thumbnail.url }}" class="img-fluid" alt="{{ related_video.title }}">
+                            {% else %}
+                                <div class="bg-secondary h-100 d-flex align-items-center justify-content-center">
+                                    <i class="bi bi-play-circle text-white"></i>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="text-dark mb-1">{{ related_video.title|truncatechars:50 }}</h6>
+                            <small class="text-muted d-block">{{ related_video.user.username }}</small>
+                            <small class="text-muted">{{ related_video.views }} views • {{ related_video.upload_date|timesince }} ago</small>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const likeButtons = document.querySelectorAll('.like-btn, .dislike-btn');
+    
+    likeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            {% if not user.is_authenticated %}
+                window.location.href = "{% url 'login' %}";
+                return;
+            {% endif %}
+            
+            const videoId = this.dataset.videoId;
+            const isLike = this.dataset.isLike;
+            
+            fetch(`/api/like/${videoId}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: `is_like=${isLike}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.querySelector('.likes-count').textContent = data.likes_count;
+                document.querySelector('.dislikes-count').textContent = data.dislikes_count;
+                
+                // Update button states
+                const likeIcon = document.querySelector('.like-btn i');
+                const dislikeIcon = document.querySelector('.dislike-btn i');
+                
+                likeIcon.classList.remove('bi-hand-thumbs-up', 'bi-hand-thumbs-up-fill');
+                dislikeIcon.classList.remove('bi-hand-thumbs-down', 'bi-hand-thumbs-down-fill');
+                
+                if (data.action === 'removed') {
+                    likeIcon.classList.add('bi-hand-thumbs-up');
+                    dislikeIcon.classList.add('bi-hand-thumbs-down');
+                } else {
+                    if (isLike === 'true') {
+                        likeIcon.classList.add('bi-hand-thumbs-up-fill');
+                        dislikeIcon.classList.add('bi-hand-thumbs-down');
+                    } else {
+                        likeIcon.classList.add('bi-hand-thumbs-up');
+                        dislikeIcon.classList.add('bi-hand-thumbs-down-fill');
+                    }
+                }
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

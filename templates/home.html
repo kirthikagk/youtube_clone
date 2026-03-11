@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - YouTube Clone{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">
+        {% if query %}
+            Search Results for "{{ query }}"
+        {% else %}
+            Recommended Videos
+        {% endif %}
+    </h2>
+
+    <div class="row g-4">
+        {% for video in videos %}
+        <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="card video-card h-100">
+                <a href="{% url 'video_detail' video.video_id %}" class="text-decoration-none">
+                    <div class="video-thumbnail">
+                        {% if video.thumbnail %}
+                            <img src="{{ video.thumbnail.url }}" class="card-img-top" alt="{{ video.title }}">
+                        {% else %}
+                            <div class="placeholder-thumbnail d-flex align-items-center justify-content-center">
+                                <i class="bi bi-play-circle fs-1 text-white"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <h6 class="card-title text-dark">{{ video.title|truncatechars:60 }}</h6>
+                        <p class="card-text">
+                            <small class="text-muted">
+                                {{ video.user.username }} • {{ video.views }} views • {{ video.upload_date|timesince }} ago
+                            </small>
+                        </p>
+                    </div>
+                </a>
+                <!-- Show video player -->
+                <video width="100%" controls>
+                    <source src="{{ video.video_file.url }}" type="video/mp4">
+                </video>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <p class="text-center text-muted">No videos found. Be the first to upload!</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
